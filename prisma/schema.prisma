@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id             String         @id @default(cuid())
+  displayName    String
+  shortCode      String         @unique
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  availabilities Availability[]
+}
+
+model Day {
+  date           DateTime       @id @db.Date
+  isOpen         Boolean        @default(true)
+  isVisible      Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  availabilities Availability[]
+}
+
+model Availability {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime @db.Date
+  status    Status
+  reason    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  day       Day      @relation(fields: [date], references: [date], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([date])
+}
+
+enum Status {
+  UNAVAILABLE
+  MAYBE
+  SPECIAL
+  AVAILABLE
+}
+
