@@ -323,8 +323,11 @@ async function lockDisplayName(
   transaction: Pick<typeof prisma, "$queryRaw">,
   displayName: string,
 ): Promise<void> {
-  await transaction.$queryRaw`
-    SELECT pg_advisory_xact_lock(hashtextextended(${displayName}, 0::bigint))
+  await transaction.$queryRaw<Array<{ locked: number }>>`
+    WITH lock AS (
+      SELECT pg_advisory_xact_lock(hashtextextended(${displayName}, 0::bigint))
+    )
+    SELECT 1::int AS locked FROM lock
   `;
 }
 
