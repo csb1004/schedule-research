@@ -75,7 +75,10 @@ export async function enterName(
     };
   }
 
-  const { user } = await getOrCreateUserByDisplayName(prisma.user, displayName);
+  const { user } = await prisma.$transaction(async (transaction) => {
+    await lockDisplayName(transaction, displayName);
+    return getOrCreateUserByDisplayName(transaction.user, displayName);
+  });
   const cookieStore = await cookies();
   cookieStore.set(USER_COOKIE, user.id, cookieOptions());
 
@@ -91,27 +94,34 @@ export async function enterName(
 
 export async function updateDisplayName(formData: FormData): Promise<EntryState> {
   const user = await requireCurrentUser();
-  let displayName: string;
+  const isAdmin = await getIsAdmin();
 
   try {
-    displayName = await validateDisplayNameRename(
-      prisma.user,
+    const displayName = normalizeDisplayName(
       String(formData.get("displayName") ?? ""),
-      user.id,
     );
     assertAdminNameAllowed(
       displayName,
       parseAdminNames(process.env.ADMIN_NAMES),
-      await getIsAdmin(),
+      isAdmin,
     );
+
+    await prisma.$transaction(async (transaction) => {
+      await lockDisplayName(transaction, displayName);
+      const validatedDisplayName = await validateDisplayNameRename(
+        transaction.user,
+        displayName,
+        user.id,
+      );
+
+      await transaction.user.update({
+        where: { id: user.id },
+        data: { displayName: validatedDisplayName },
+      });
+    });
   } catch (error) {
     return { ok: false, error: getActionErrorMessage(error) };
   }
-
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { displayName },
-  });
 
   revalidatePath("/");
   return { ok: true };
@@ -307,6 +317,15 @@ function requireAdminSecret(): string {
 
 function getActionErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "요청을 처리하지 못했습니다.";
+}
+
+async function lockDisplayName(
+  transaction: Pick<typeof prisma, "$queryRaw">,
+  displayName: string,
+): Promise<void> {
+  await transaction.$queryRaw`
+    SELECT pg_advisory_xact_lock(hashtextextended(${displayName}, 0::bigint))
+  `;
 }
 
 function cookieOptions() {
