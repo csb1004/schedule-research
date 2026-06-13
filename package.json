@@ -8,6 +8,7 @@
     "build": "prisma generate && next build",
     "postinstall": "prisma generate",
     "start": "next start",
+    "railway:start": "node scripts/railway-start.mjs",
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
