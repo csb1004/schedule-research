@@ -308,7 +308,7 @@ export function ScheduleCalendar({
               setSettingsOpen(true);
             }}
           >
-            {currentUser.displayName} #{currentUser.shortCode}
+            {currentUser.displayName}
           </button>
           {isAdmin ? <span className="toolbar-pill admin">관리자</span> : null}
         </div>
@@ -559,7 +559,6 @@ function DetailPanel({
                 }
               >
                 <strong>{entry.userName}</strong>
-                <span>#{entry.shortCode}</span>
               </button>
               <span className={`status-badge ${statusColor(entry.status)}`}>
                 {STATUS_LABELS[entry.status]}

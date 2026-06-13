@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import {
+  assertAdminNameAllowed,
   parseAdminNames,
   signAdminSession,
   verifyAdminSession,
@@ -97,6 +98,11 @@ export async function updateDisplayName(formData: FormData): Promise<EntryState>
       prisma.user,
       String(formData.get("displayName") ?? ""),
       user.id,
+    );
+    assertAdminNameAllowed(
+      displayName,
+      parseAdminNames(process.env.ADMIN_NAMES),
+      await getIsAdmin(),
     );
   } catch (error) {
     return { ok: false, error: getActionErrorMessage(error) };

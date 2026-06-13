@@ -10,8 +10,3 @@ export function createShortCode(random = Math.random): string {
 
   return code;
 }
-
-export function formatDisplayUser(displayName: string, shortCode: string): string {
-  return `${displayName} #${shortCode}`;
-}
-
