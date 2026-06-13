@@ -36,6 +36,15 @@ ADMIN_PASSWORD="change-me"
 ADMIN_SESSION_SECRET="replace-with-a-long-random-secret"
 ```
 
+For a quick local PostgreSQL database without Docker, start Prisma dev:
+
+```powershell
+npx prisma dev --detach --name schedule-calendar
+npx prisma dev ls
+```
+
+Use the TCP `DATABASE_URL` shown by `npx prisma dev ls` in your `.env`.
+
 Apply migrations:
 
 ```powershell
@@ -68,4 +77,3 @@ npm run dev
 npm test
 npm run build
 ```
-

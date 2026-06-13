@@ -122,6 +122,12 @@ a {
   font-size: 13px;
 }
 
+.error-copy {
+  margin: 0 0 18px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
 .app-shell {
   width: min(1280px, 100%);
   min-height: 100vh;
