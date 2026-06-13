@@ -2,9 +2,16 @@ import { spawn } from "node:child_process";
 
 const host = "0.0.0.0";
 const port = process.env.PORT || "3000";
+const deploymentId =
+  process.env.RAILWAY_GIT_COMMIT_SHA ??
+  process.env.RAILWAY_DEPLOYMENT_ID ??
+  process.env.DEPLOYMENT_VERSION ??
+  "missing";
 
 console.log(
-  `[railway-start] DATABASE_URL=${process.env.DATABASE_URL ? "set" : "missing"} PORT=${port}`,
+  `[railway-start] DATABASE_URL=${process.env.DATABASE_URL ? "set" : "missing"} NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${
+    process.env.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY ? "set" : "missing"
+  } deploymentId=${deploymentId} PORT=${port}`,
 );
 
 await run("npx", ["prisma", "migrate", "deploy"]);

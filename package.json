@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
+    "railway:build": "node scripts/railway-build.mjs",
     "postinstall": "prisma generate",
     "start": "next start",
     "railway:start": "node scripts/railway-start.mjs",
