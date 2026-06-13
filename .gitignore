@@ -7,6 +7,8 @@ out/
 dist/
 coverage/
 tsconfig.tsbuildinfo
+next-env.d.ts
+.next-dev.*
 src/generated/prisma/
 .vercel/
 .railway/
