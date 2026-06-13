@@ -323,12 +323,27 @@ async function lockDisplayName(
   transaction: Pick<typeof prisma, "$queryRaw">,
   displayName: string,
 ): Promise<void> {
-  await transaction.$queryRaw<Array<{ locked: number }>>`
-    WITH lock AS (
-      SELECT pg_advisory_xact_lock(hashtextextended(${displayName}, 0::bigint))
-    )
-    SELECT 1::int AS locked FROM lock
-  `;
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const [row] = await transaction.$queryRaw<Array<{ locked: boolean }>>`
+      SELECT pg_try_advisory_xact_lock(
+        hashtextextended(${displayName}, 0::bigint)
+      ) AS locked
+    `;
+
+    if (row?.locked) {
+      return;
+    }
+
+    await delay(25);
+  }
+
+  throw new Error("이름 처리 중입니다. 잠시 후 다시 시도해주세요.");
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
 }
 
 function cookieOptions() {
