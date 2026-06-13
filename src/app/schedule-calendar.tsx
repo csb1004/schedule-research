@@ -1,5 +1,6 @@
 "use client";
 
+import type { FormEvent } from "react";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -24,6 +25,11 @@ type ScheduleCalendarProps = {
   schedule: ScheduleData;
 };
 
+type PendingSpecialNote =
+  | { mode: "single"; date: string }
+  | { mode: "bulk"; dates: string[] }
+  | { mode: "admin"; date: string; entry: ScheduleEntry };
+
 export function ScheduleCalendar({
   currentUser,
   isAdmin,
@@ -40,6 +46,9 @@ export function ScheduleCalendar({
   const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
   const [reasonEntryId, setReasonEntryId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [pendingSpecialNote, setPendingSpecialNote] =
+    useState<PendingSpecialNote | null>(null);
+  const [specialReason, setSpecialReason] = useState("");
   const [isPending, startTransition] = useTransition();
 
   const selectedDay = useMemo(
@@ -88,14 +97,14 @@ export function ScheduleCalendar({
       return;
     }
 
-    const reason = requestReason(status);
-
-    if (status === "SPECIAL" && !reason) {
+    if (status === "SPECIAL") {
+      setSpecialReason("");
+      setPendingSpecialNote({ mode: "single", date: selectedDay.date });
       return;
     }
 
     startTransition(async () => {
-      await setAvailability({ date: selectedDay.date, status, reason });
+      await setAvailability({ date: selectedDay.date, status });
       router.refresh();
     });
   }
@@ -105,9 +114,9 @@ export function ScheduleCalendar({
       return;
     }
 
-    const reason = requestReason(status);
-
-    if (status === "SPECIAL" && !reason) {
+    if (status === "SPECIAL") {
+      setSpecialReason("");
+      setPendingSpecialNote({ mode: "bulk", dates: [...selectedDates] });
       return;
     }
 
@@ -115,7 +124,6 @@ export function ScheduleCalendar({
       await bulkSetAvailability({
         dates: [...selectedDates],
         status,
-        reason,
       });
       setSelectedDates(new Set());
       setSelectionMode(false);
@@ -128,9 +136,9 @@ export function ScheduleCalendar({
       return;
     }
 
-    const reason = requestReason(status, entry.reason ?? "");
-
-    if (status === "SPECIAL" && !reason) {
+    if (status === "SPECIAL") {
+      setSpecialReason(entry.reason ?? "");
+      setPendingSpecialNote({ mode: "admin", date: selectedDay.date, entry });
       return;
     }
 
@@ -139,8 +147,59 @@ export function ScheduleCalendar({
         userId: entry.userId,
         date: selectedDay.date,
         status,
-        reason,
       });
+      router.refresh();
+    });
+  }
+
+  function cancelSpecialNote() {
+    setPendingSpecialNote(null);
+    setSpecialReason("");
+  }
+
+  function submitSpecialNote(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!pendingSpecialNote) {
+      return;
+    }
+
+    const reason = specialReason.trim();
+
+    if (!reason) {
+      return;
+    }
+
+    startTransition(async () => {
+      if (pendingSpecialNote.mode === "single") {
+        await setAvailability({
+          date: pendingSpecialNote.date,
+          status: "SPECIAL",
+          reason,
+        });
+      }
+
+      if (pendingSpecialNote.mode === "bulk") {
+        await bulkSetAvailability({
+          dates: pendingSpecialNote.dates,
+          status: "SPECIAL",
+          reason,
+        });
+        setSelectedDates(new Set());
+        setSelectionMode(false);
+      }
+
+      if (pendingSpecialNote.mode === "admin") {
+        await adminSetAvailability({
+          userId: pendingSpecialNote.entry.userId,
+          date: pendingSpecialNote.date,
+          status: "SPECIAL",
+          reason,
+        });
+      }
+
+      setPendingSpecialNote(null);
+      setSpecialReason("");
       router.refresh();
     });
   }
@@ -320,6 +379,35 @@ export function ScheduleCalendar({
           </form>
         </div>
       ) : null}
+
+      {pendingSpecialNote ? (
+        <div className="dialog-backdrop" role="presentation">
+          <form
+            className="settings-dialog note-dialog"
+            onSubmit={submitSpecialNote}
+          >
+            <h2>특이사항 사유</h2>
+            <label>
+              사유
+              <textarea
+                value={specialReason}
+                onChange={(event) => setSpecialReason(event.target.value)}
+                required
+                autoFocus
+                rows={4}
+              />
+            </label>
+            <div className="dialog-actions">
+              <button type="button" onClick={cancelSpecialNote}>
+                취소
+              </button>
+              <button type="submit" disabled={isPending || !specialReason.trim()}>
+                저장
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </main>
   );
 }
@@ -479,14 +567,6 @@ function DetailPanel({
       </div>
     </aside>
   );
-}
-
-function requestReason(status: Status, initialValue = ""): string | undefined {
-  if (status !== "SPECIAL") {
-    return undefined;
-  }
-
-  return window.prompt("특이사항 사유", initialValue)?.trim();
 }
 
 function statusColor(status: Status): string {

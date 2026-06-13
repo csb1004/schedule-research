@@ -97,13 +97,19 @@ a {
 }
 
 .entry-form input,
-.settings-dialog input {
+.settings-dialog input,
+.settings-dialog textarea {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 11px 12px;
   color: var(--text);
   background: #fff;
+}
+
+.settings-dialog textarea {
+  min-height: 104px;
+  resize: vertical;
 }
 
 .entry-form button,
@@ -588,6 +594,10 @@ a {
   background: #fff;
   padding: 18px;
   box-shadow: 0 28px 70px rgba(15, 23, 42, 0.22);
+}
+
+.note-dialog {
+  width: min(420px, 100%);
 }
 
 .settings-dialog h2 {
