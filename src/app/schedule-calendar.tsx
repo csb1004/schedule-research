@@ -47,6 +47,11 @@ export function ScheduleCalendar({
   const [reasonEntryId, setReasonEntryId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [settingsRequiresPassword, setSettingsRequiresPassword] =
+    useState(false);
+  const [settingsAdminName, setSettingsAdminName] = useState<string | null>(
+    null,
+  );
   const [pendingSpecialNote, setPendingSpecialNote] =
     useState<PendingSpecialNote | null>(null);
   const [specialReason, setSpecialReason] = useState("");
@@ -95,6 +100,16 @@ export function ScheduleCalendar({
 
   function applyStatus(status: Status) {
     if (!selectedDay || (!selectedDay.isOpen && !isAdmin)) {
+      return;
+    }
+
+    const currentUserEntry = findCurrentUserEntry(selectedDay, currentUser.id);
+
+    if (currentUserEntry?.status === status) {
+      startTransition(async () => {
+        await setAvailability({ date: selectedDay.date, status });
+        router.refresh();
+      });
       return;
     }
 
@@ -232,11 +247,22 @@ export function ScheduleCalendar({
       const result = await updateDisplayName(formData);
 
       if (!result.ok) {
+        if (result.requiresPassword) {
+          setSettingsRequiresPassword(true);
+          setSettingsAdminName(
+            result.adminName ?? String(formData.get("displayName") ?? ""),
+          );
+          setSettingsError(result.error ?? null);
+          return;
+        }
+
         setSettingsError(result.error ?? "이름을 변경하지 못했습니다.");
         return;
       }
 
       setSettingsError(null);
+      setSettingsRequiresPassword(false);
+      setSettingsAdminName(null);
       setSettingsOpen(false);
       router.refresh();
     });
@@ -305,6 +331,8 @@ export function ScheduleCalendar({
             className="toolbar-pill"
             onClick={() => {
               setSettingsError(null);
+              setSettingsRequiresPassword(false);
+              setSettingsAdminName(null);
               setSettingsOpen(true);
             }}
           >
@@ -348,6 +376,7 @@ export function ScheduleCalendar({
                 selected={day.date === selectedDate}
                 multiSelected={selectedDates.has(day.date)}
                 isAdmin={isAdmin}
+                currentUserId={currentUser.id}
                 onClick={() => handleDateClick(day)}
               />
             ))}
@@ -358,6 +387,7 @@ export function ScheduleCalendar({
           day={selectedDay}
           isAdmin={isAdmin}
           isPending={isPending}
+          currentUserId={currentUser.id}
           reasonEntryId={reasonEntryId}
           onSelectReason={setReasonEntryId}
           onApplyStatus={applyStatus}
@@ -374,11 +404,22 @@ export function ScheduleCalendar({
             <label>
               이름
               <input
+                key={settingsAdminName ?? currentUser.displayName}
                 name="displayName"
-                defaultValue={currentUser.displayName}
+                defaultValue={settingsAdminName ?? currentUser.displayName}
                 required
               />
             </label>
+            {settingsRequiresPassword ? (
+              <label>
+                관리자 비밀번호
+                <input
+                  name="adminPassword"
+                  type="password"
+                  autoComplete="current-password"
+                />
+              </label>
+            ) : null}
             {settingsError ? (
               <p className="form-error">{settingsError}</p>
             ) : null}
@@ -387,6 +428,8 @@ export function ScheduleCalendar({
                 type="button"
                 onClick={() => {
                   setSettingsError(null);
+                  setSettingsRequiresPassword(false);
+                  setSettingsAdminName(null);
                   setSettingsOpen(false);
                 }}
               >
@@ -437,42 +480,69 @@ function DateCell({
   selected,
   multiSelected,
   isAdmin,
+  currentUserId,
   onClick,
 }: {
   day: ScheduleDay;
   selected: boolean;
   multiSelected: boolean;
   isAdmin: boolean;
+  currentUserId: string;
   onClick: () => void;
 }) {
   const disabled = !day.inMonth || (!day.isOpen && !isAdmin);
+  const currentUserEntry = findCurrentUserEntry(day, currentUserId);
+  const ownStatusColor = currentUserEntry
+    ? statusColor(currentUserEntry.status)
+    : null;
   const className = [
     "date-cell",
     !day.inMonth ? "outside" : "",
     !day.isOpen ? "closed" : "",
     selected ? "selected" : "",
     multiSelected ? "multi-selected" : "",
+    currentUserEntry ? "own-status" : "",
+    ownStatusColor ? `own-${ownStatusColor}` : "",
   ]
     .filter(Boolean)
     .join(" ");
 
   return (
-    <button type="button" className={className} disabled={disabled} onClick={onClick}>
-      <span className="day-number">{day.day}</span>
+    <button
+      type="button"
+      className={className}
+      disabled={disabled}
+      aria-pressed={Boolean(currentUserEntry)}
+      onClick={onClick}
+    >
+      <span className="date-cell-heading">
+        <span className="day-number">{day.day}</span>
+        {currentUserEntry ? (
+          <span className={`own-status-badge ${ownStatusColor}`}>
+            내 {shortStatusLabel(currentUserEntry.status)}
+          </span>
+        ) : null}
+      </span>
       <div className="status-slot-grid" aria-hidden={!day.isOpen && !isAdmin}>
-        {STATUS_SLOTS.map((slot) =>
-          day.counts[slot.status] > 0 ? (
+        {STATUS_SLOTS.map((slot) => {
+          const isOwnSlot = currentUserEntry?.status === slot.status;
+
+          return day.counts[slot.status] > 0 ? (
             <span
               key={slot.status}
-              className={`status-slot ${slot.colorName}`}
-              title={`${slot.label} ${day.counts[slot.status]}`}
+              className={`status-slot ${slot.colorName} ${
+                isOwnSlot ? "mine" : ""
+              }`}
+              title={`${slot.label} ${day.counts[slot.status]}${
+                isOwnSlot ? " · 내 상태" : ""
+              }`}
             >
               {day.counts[slot.status]}
             </span>
           ) : (
             <span key={slot.status} className="status-slot empty" />
-          ),
-        )}
+          );
+        })}
       </div>
     </button>
   );
@@ -482,6 +552,7 @@ function DetailPanel({
   day,
   isAdmin,
   isPending,
+  currentUserId,
   reasonEntryId,
   onSelectReason,
   onApplyStatus,
@@ -492,6 +563,7 @@ function DetailPanel({
   day: ScheduleDay | null;
   isAdmin: boolean;
   isPending: boolean;
+  currentUserId: string;
   reasonEntryId: string | null;
   onSelectReason: (entryId: string | null) => void;
   onApplyStatus: (status: Status) => void;
@@ -504,6 +576,7 @@ function DetailPanel({
   }
 
   const activeReason = day.entries.find((entry) => entry.id === reasonEntryId);
+  const currentUserEntry = findCurrentUserEntry(day, currentUserId);
 
   return (
     <aside className="detail-panel">
@@ -521,7 +594,10 @@ function DetailPanel({
             <button
               type="button"
               key={slot.status}
-              className={`status-button ${slot.colorName}`}
+              className={`status-button ${slot.colorName} ${
+                currentUserEntry?.status === slot.status ? "active" : ""
+              }`}
+              aria-pressed={currentUserEntry?.status === slot.status}
               disabled={isPending || (!day.isOpen && !isAdmin)}
               onClick={() => onApplyStatus(slot.status)}
             >
@@ -590,6 +666,17 @@ function DetailPanel({
 
 function statusColor(status: Status): string {
   return STATUS_SLOTS.find((slot) => slot.status === status)?.colorName ?? "green";
+}
+
+function shortStatusLabel(status: Status): string {
+  return STATUS_SLOTS.find((slot) => slot.status === status)?.shortLabel ?? "";
+}
+
+function findCurrentUserEntry(
+  day: ScheduleDay,
+  currentUserId: string,
+): ScheduleEntry | null {
+  return day.entries.find((entry) => entry.userId === currentUserId) ?? null;
 }
 
 function formatMonthLabel(month: string): string {

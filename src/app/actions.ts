@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { shouldClearAvailability } from "@/lib/availability";
 import {
-  assertAdminNameAllowed,
   parseAdminNames,
   signAdminSession,
   verifyAdminSession,
@@ -86,6 +86,8 @@ export async function enterName(
     const secret = requireAdminSecret();
     const token = await signAdminSession(user.id, secret, ADMIN_TTL_SECONDS);
     cookieStore.set(ADMIN_COOKIE, token, cookieOptions());
+  } else {
+    cookieStore.delete(ADMIN_COOKIE);
   }
 
   revalidatePath("/");
@@ -93,34 +95,64 @@ export async function enterName(
 }
 
 export async function updateDisplayName(formData: FormData): Promise<EntryState> {
-  const user = await requireCurrentUser();
-  const isAdmin = await getIsAdmin();
+  await requireCurrentUser();
+  let displayName: string;
 
   try {
-    const displayName = normalizeDisplayName(
+    displayName = normalizeDisplayName(
       String(formData.get("displayName") ?? ""),
     );
-    assertAdminNameAllowed(
-      displayName,
-      parseAdminNames(process.env.ADMIN_NAMES),
-      isAdmin,
-    );
-
-    await prisma.$transaction(async (transaction) => {
-      await lockDisplayName(transaction, displayName);
-      const validatedDisplayName = await validateDisplayNameRename(
-        transaction.user,
-        displayName,
-        user.id,
-      );
-
-      await transaction.user.update({
-        where: { id: user.id },
-        data: { displayName: validatedDisplayName },
-      });
-    });
   } catch (error) {
     return { ok: false, error: getActionErrorMessage(error) };
+  }
+
+  const password = String(formData.get("adminPassword") ?? "");
+  const adminNames = parseAdminNames(process.env.ADMIN_NAMES);
+  const isAdminName = adminNames.includes(displayName);
+
+  if (isAdminName && !password) {
+    return { ok: false, requiresPassword: true, adminName: displayName };
+  }
+
+  if (isAdminName && password !== process.env.ADMIN_PASSWORD) {
+    return {
+      ok: false,
+      error: "관리자 비밀번호가 올바르지 않습니다.",
+      requiresPassword: true,
+      adminName: displayName,
+    };
+  }
+
+  let renamedUserId: string;
+
+  try {
+    const { user } = await prisma.$transaction(async (transaction) => {
+      await lockDisplayName(transaction, displayName);
+      const validatedDisplayName = validateDisplayNameRename(displayName);
+
+      return getOrCreateUserByDisplayName(
+        transaction.user,
+        validatedDisplayName,
+      );
+    });
+    renamedUserId = user.id;
+  } catch (error) {
+    return { ok: false, error: getActionErrorMessage(error) };
+  }
+
+  const cookieStore = await cookies();
+  cookieStore.set(USER_COOKIE, renamedUserId, cookieOptions());
+
+  if (isAdminName) {
+    const secret = requireAdminSecret();
+    const token = await signAdminSession(
+      renamedUserId,
+      secret,
+      ADMIN_TTL_SECONDS,
+    );
+    cookieStore.set(ADMIN_COOKIE, token, cookieOptions());
+  } else {
+    cookieStore.delete(ADMIN_COOKIE);
   }
 
   revalidatePath("/");
@@ -131,7 +163,9 @@ export async function setAvailability(input: unknown) {
   const user = await requireCurrentUser();
   const parsed = availabilityInputSchema().parse(input);
   await ensureEditableDate(parsed.date, false);
-  await upsertAvailability(user.id, parsed.date, parsed.status, parsed.reason);
+  await upsertAvailability(user.id, parsed.date, parsed.status, parsed.reason, {
+    toggleSameStatus: true,
+  });
   revalidatePath("/");
 }
 
@@ -277,28 +311,47 @@ async function upsertAvailability(
   date: string,
   status: AvailabilityStatus,
   reason?: string,
+  options: { toggleSameStatus?: boolean } = {},
 ) {
-  const cleanReason = status === "SPECIAL" ? reason?.trim() : null;
+  const dateKey = parseDateKey(date);
+  const availabilityKey = {
+    userId_date: {
+      userId,
+      date: dateKey,
+    },
+  };
 
+  if (options.toggleSameStatus) {
+    const existingAvailability = await prisma.availability.findUnique({
+      where: availabilityKey,
+    });
+
+    if (
+      existingAvailability &&
+      shouldClearAvailability(existingAvailability.status, status)
+    ) {
+      await prisma.availability.delete({
+        where: availabilityKey,
+      });
+      return;
+    }
+  }
+
+  const cleanReason = status === "SPECIAL" ? reason?.trim() : null;
   if (status === "SPECIAL" && !cleanReason) {
     throw new Error("특이사항 사유를 입력해주세요.");
   }
 
   await ensureDay(date);
   await prisma.availability.upsert({
-    where: {
-      userId_date: {
-        userId,
-        date: parseDateKey(date),
-      },
-    },
+    where: availabilityKey,
     update: {
       status,
       reason: cleanReason,
     },
     create: {
       userId,
-      date: parseDateKey(date),
+      date: dateKey,
       status,
       reason: cleanReason,
     },

@@ -11,16 +11,6 @@ export function parseAdminNames(value: string | undefined): string[] {
     .filter(Boolean);
 }
 
-export function assertAdminNameAllowed(
-  displayName: string,
-  adminNames: string[],
-  isAdmin: boolean,
-): void {
-  if (!isAdmin && adminNames.includes(displayName)) {
-    throw new Error("관리자 이름은 관리자만 사용할 수 있습니다.");
-  }
-}
-
 export type VerifiedAdminSession = {
   userId: string;
 };

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   aggregateStatusCounts,
   emptyStatusCounts,
+  shouldClearAvailability,
   sanitizeClosedDayForUser,
 } from "./availability";
 
@@ -19,6 +20,16 @@ describe("aggregateStatusCounts", () => {
       SPECIAL: 1,
       AVAILABLE: 2,
     });
+  });
+});
+
+describe("shouldClearAvailability", () => {
+  it("clears an availability when the same status is selected again", () => {
+    expect(shouldClearAvailability("AVAILABLE", "AVAILABLE")).toBe(true);
+  });
+
+  it("keeps an availability when a different status is selected", () => {
+    expect(shouldClearAvailability("AVAILABLE", "MAYBE")).toBe(false);
   });
 });
 
@@ -54,4 +65,3 @@ describe("sanitizeClosedDayForUser", () => {
     expect(sanitizeClosedDayForUser(day, true)).toEqual(day);
   });
 });
-

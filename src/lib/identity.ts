@@ -67,22 +67,8 @@ export async function getOrCreateUserByDisplayName(
   throw new Error("사용자 코드를 생성하지 못했습니다.");
 }
 
-export async function validateDisplayNameRename(
-  userStore: UserIdentityStore,
-  displayName: string,
-  currentUserId: string,
-): Promise<string> {
-  const normalizedName = requireDisplayName(displayName);
-  const existingUser = await findOldestUserByDisplayName(
-    userStore,
-    normalizedName,
-  );
-
-  if (existingUser && existingUser.id !== currentUserId) {
-    throw new Error("이미 사용 중인 이름입니다.");
-  }
-
-  return normalizedName;
+export function validateDisplayNameRename(displayName: string): string {
+  return requireDisplayName(displayName);
 }
 
 function requireDisplayName(displayName: string): string {

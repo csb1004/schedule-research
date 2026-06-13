@@ -127,33 +127,11 @@ describe("getOrCreateUserByDisplayName", () => {
 });
 
 describe("validateDisplayNameRename", () => {
-  it("rejects a display name used by another user", async () => {
-    const userStore = new FakeUserIdentityStore([
-      {
-        id: "other-user",
-        displayName: "지민",
-        shortCode: "AAAA",
-        createdAt: new Date("2026-06-01T00:00:00.000Z"),
-      },
-    ]);
-
-    await expect(
-      validateDisplayNameRename(userStore, " 지민 ", "current-user"),
-    ).rejects.toThrow("이미 사용 중인 이름입니다.");
+  it("allows a display name used by another user", () => {
+    expect(validateDisplayNameRename(" 지민 ")).toBe("지민");
   });
 
-  it("allows keeping the current user's display name", async () => {
-    const userStore = new FakeUserIdentityStore([
-      {
-        id: "current-user",
-        displayName: "지민",
-        shortCode: "AAAA",
-        createdAt: new Date("2026-06-01T00:00:00.000Z"),
-      },
-    ]);
-
-    await expect(
-      validateDisplayNameRename(userStore, " 지민 ", "current-user"),
-    ).resolves.toBe("지민");
+  it("allows keeping the current user's display name", () => {
+    expect(validateDisplayNameRename(" 지민 ")).toBe("지민");
   });
 });

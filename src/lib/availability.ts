@@ -35,6 +35,13 @@ export function aggregateStatusCounts(
   return counts;
 }
 
+export function shouldClearAvailability(
+  currentStatus: Status,
+  requestedStatus: Status,
+): boolean {
+  return currentStatus === requestedStatus;
+}
+
 export function sanitizeClosedDayForUser<
   TEntry,
   TDay extends CalendarDaySummary<TEntry>,

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  assertAdminNameAllowed,
   parseAdminNames,
   signAdminSession,
   verifyAdminSession,
@@ -13,24 +12,6 @@ describe("parseAdminNames", () => {
       "admin",
       "Alex",
     ]);
-  });
-});
-
-describe("assertAdminNameAllowed", () => {
-  it("rejects reserved admin names for non-admin users", () => {
-    expect(() => assertAdminNameAllowed("owner", ["owner"], false)).toThrow(
-      "관리자 이름은 관리자만 사용할 수 있습니다.",
-    );
-  });
-
-  it("allows reserved admin names for admin users", () => {
-    expect(() => assertAdminNameAllowed("owner", ["owner"], true)).not.toThrow();
-  });
-
-  it("allows ordinary names for non-admin users", () => {
-    expect(() =>
-      assertAdminNameAllowed("member", ["owner"], false),
-    ).not.toThrow();
   });
 });
 
