@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildMonthDays, buildVisibleMonths } from "./calendar";
+import {
+  buildMonthDays,
+  buildVisibleMonths,
+  enumerateDateRange,
+  getMonthDateRange,
+} from "./calendar";
 
 describe("buildVisibleMonths", () => {
   it("returns the current month and next two months by default", () => {
@@ -21,6 +26,24 @@ describe("buildVisibleMonths", () => {
   });
 });
 
+describe("date range helpers", () => {
+  it("returns the first and last date keys for a month", () => {
+    expect(getMonthDateRange("2026-02")).toEqual({
+      start: "2026-02-01",
+      end: "2026-02-28",
+    });
+  });
+
+  it("enumerates date keys inclusively", () => {
+    expect(enumerateDateRange("2026-06-29", "2026-07-02")).toEqual([
+      "2026-06-29",
+      "2026-06-30",
+      "2026-07-01",
+      "2026-07-02",
+    ]);
+  });
+});
+
 describe("buildMonthDays", () => {
   it("builds calendar cells starting on Monday and ending on Sunday", () => {
     const days = buildMonthDays("2026-06");
@@ -32,4 +55,3 @@ describe("buildMonthDays", () => {
     expect(days).toHaveLength(35);
   });
 });
-

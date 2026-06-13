@@ -35,10 +35,13 @@ export function aggregateStatusCounts(
   return counts;
 }
 
-export function sanitizeClosedDayForUser<TEntry>(
-  day: CalendarDaySummary<TEntry>,
+export function sanitizeClosedDayForUser<
+  TEntry,
+  TDay extends CalendarDaySummary<TEntry>,
+>(
+  day: TDay,
   isAdmin: boolean,
-): CalendarDaySummary<TEntry> {
+): TDay {
   if (day.isOpen || isAdmin) {
     return day;
   }
@@ -47,6 +50,5 @@ export function sanitizeClosedDayForUser<TEntry>(
     ...day,
     counts: emptyStatusCounts(),
     entries: [],
-  };
+  } as TDay;
 }
-

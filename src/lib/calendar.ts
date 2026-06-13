@@ -46,6 +46,29 @@ export function buildMonthDays(month: string): CalendarDay[] {
   return days;
 }
 
+export function getMonthDateRange(month: string): { start: string; end: string } {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const start = new Date(Date.UTC(year, monthNumber - 1, 1));
+  const end = new Date(Date.UTC(year, monthNumber, 0));
+
+  return {
+    start: formatDate(start),
+    end: formatDate(end),
+  };
+}
+
+export function enumerateDateRange(startDate: string, endDate: string): string[] {
+  const start = parseDateKey(startDate);
+  const end = parseDateKey(endDate);
+  const dates: string[] = [];
+
+  for (let cursor = start; cursor <= end; cursor = addDays(cursor, 1)) {
+    dates.push(formatDate(cursor));
+  }
+
+  return dates;
+}
+
 export function formatDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
@@ -66,3 +89,6 @@ export function addDays(date: Date, days: number): Date {
   return next;
 }
 
+export function parseDateKey(date: string): Date {
+  return new Date(`${date}T00:00:00.000Z`);
+}
