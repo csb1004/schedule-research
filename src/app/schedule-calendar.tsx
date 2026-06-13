@@ -36,10 +36,11 @@ export function ScheduleCalendar({
   schedule,
 }: ScheduleCalendarProps) {
   const router = useRouter();
-  const [selectedDate, setSelectedDate] = useState(
+  const [selectedDate, setSelectedDate] = useState<string | null>(
     schedule.days.find((day) => day.inMonth && (day.isOpen || isAdmin))?.date ??
       schedule.days.find((day) => day.inMonth)?.date ??
-      schedule.days[0]?.date,
+      schedule.days[0]?.date ??
+      null,
   );
   const [monthMenuOpen, setMonthMenuOpen] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
@@ -58,7 +59,10 @@ export function ScheduleCalendar({
   const [isPending, startTransition] = useTransition();
 
   const selectedDay = useMemo(
-    () => schedule.days.find((day) => day.date === selectedDate) ?? null,
+    () =>
+      selectedDate
+        ? schedule.days.find((day) => day.date === selectedDate) ?? null
+        : null,
     [schedule.days, selectedDate],
   );
   const selectedMonthIndex = schedule.months.indexOf(schedule.selectedMonth);
@@ -95,6 +99,11 @@ export function ScheduleCalendar({
     }
 
     setSelectedDate(day.date);
+    setReasonEntryId(null);
+  }
+
+  function closeDetailPanel() {
+    setSelectedDate(null);
     setReasonEntryId(null);
   }
 
@@ -361,10 +370,14 @@ export function ScheduleCalendar({
         </section>
       ) : null}
 
-      <div className="calendar-workspace">
+      <div
+        className={
+          selectedDay ? "calendar-workspace" : "calendar-workspace detail-closed"
+        }
+      >
         <section className="calendar-panel">
           <div className="weekday-grid">
-            {["월", "화", "수", "목", "금", "토", "일"].map((day) => (
+            {["일", "월", "화", "수", "목", "금", "토"].map((day) => (
               <span key={day}>{day}</span>
             ))}
           </div>
@@ -383,18 +396,21 @@ export function ScheduleCalendar({
           </div>
         </section>
 
-        <DetailPanel
-          day={selectedDay}
-          isAdmin={isAdmin}
-          isPending={isPending}
-          currentUserId={currentUser.id}
-          reasonEntryId={reasonEntryId}
-          onSelectReason={setReasonEntryId}
-          onApplyStatus={applyStatus}
-          onAdminStatus={applyAdminStatus}
-          onSetDayOpen={setDayOpen}
-          onSetMonthOpen={setMonthOpen}
-        />
+        {selectedDay ? (
+          <DetailPanel
+            day={selectedDay}
+            isAdmin={isAdmin}
+            isPending={isPending}
+            currentUserId={currentUser.id}
+            reasonEntryId={reasonEntryId}
+            onSelectReason={setReasonEntryId}
+            onApplyStatus={applyStatus}
+            onAdminStatus={applyAdminStatus}
+            onSetDayOpen={setDayOpen}
+            onSetMonthOpen={setMonthOpen}
+            onClose={closeDetailPanel}
+          />
+        ) : null}
       </div>
 
       {settingsOpen ? (
@@ -517,25 +533,14 @@ function DateCell({
     >
       <span className="date-cell-heading">
         <span className="day-number">{day.day}</span>
-        {currentUserEntry ? (
-          <span className={`own-status-badge ${ownStatusColor}`}>
-            내 {shortStatusLabel(currentUserEntry.status)}
-          </span>
-        ) : null}
       </span>
       <div className="status-slot-grid" aria-hidden={!day.isOpen && !isAdmin}>
         {STATUS_SLOTS.map((slot) => {
-          const isOwnSlot = currentUserEntry?.status === slot.status;
-
           return day.counts[slot.status] > 0 ? (
             <span
               key={slot.status}
-              className={`status-slot ${slot.colorName} ${
-                isOwnSlot ? "mine" : ""
-              }`}
-              title={`${slot.label} ${day.counts[slot.status]}${
-                isOwnSlot ? " · 내 상태" : ""
-              }`}
+              className={`status-slot ${slot.colorName}`}
+              title={`${slot.label} ${day.counts[slot.status]}`}
             >
               {day.counts[slot.status]}
             </span>
@@ -559,8 +564,9 @@ function DetailPanel({
   onAdminStatus,
   onSetDayOpen,
   onSetMonthOpen,
+  onClose,
 }: {
-  day: ScheduleDay | null;
+  day: ScheduleDay;
   isAdmin: boolean;
   isPending: boolean;
   currentUserId: string;
@@ -570,11 +576,8 @@ function DetailPanel({
   onAdminStatus: (entry: ScheduleEntry, status: Status) => void;
   onSetDayOpen: (isOpen: boolean) => void;
   onSetMonthOpen: (isOpen: boolean) => void;
+  onClose: () => void;
 }) {
-  if (!day) {
-    return <aside className="detail-panel empty">날짜를 선택해주세요.</aside>;
-  }
-
   const activeReason = day.entries.find((entry) => entry.id === reasonEntryId);
   const currentUserEntry = findCurrentUserEntry(day, currentUserId);
 
@@ -585,7 +588,17 @@ function DetailPanel({
           <h2>{formatDateLabel(day.date)}</h2>
           <p>{formatSummary(day)}</p>
         </div>
-        {!day.isOpen ? <span className="closed-badge">닫힘</span> : null}
+        <div className="detail-heading-actions">
+          {!day.isOpen ? <span className="closed-badge">닫힘</span> : null}
+          <button
+            type="button"
+            className="detail-close-button"
+            aria-label="상세 닫기"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
       </div>
 
       {day.isOpen || isAdmin ? (
@@ -666,10 +679,6 @@ function DetailPanel({
 
 function statusColor(status: Status): string {
   return STATUS_SLOTS.find((slot) => slot.status === status)?.colorName ?? "green";
-}
-
-function shortStatusLabel(status: Status): string {
-  return STATUS_SLOTS.find((slot) => slot.status === status)?.shortLabel ?? "";
 }
 
 function findCurrentUserEntry(

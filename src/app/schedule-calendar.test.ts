@@ -35,4 +35,24 @@ describe("ScheduleCalendar special note UI", () => {
     expect(source).toContain("aria-pressed");
     expect(source).toContain('? "active" : ""');
   });
+
+  it("uses date number color rather than a badge for the current user's date status", () => {
+    const source = readFileSync("src/app/schedule-calendar.tsx", "utf8");
+    const styles = readFileSync("src/app/globals.css", "utf8");
+
+    expect(source).toContain("own-${ownStatusColor}");
+    expect(source).not.toContain("own-status-badge");
+    expect(styles).toContain(".date-cell.own-red .day-number");
+    expect(styles).not.toContain(".status-slot.mine");
+  });
+
+  it("can close the selected date detail panel", () => {
+    const source = readFileSync("src/app/schedule-calendar.tsx", "utf8");
+    const styles = readFileSync("src/app/globals.css", "utf8");
+
+    expect(source).toContain("function closeDetailPanel()");
+    expect(source).toContain("setSelectedDate(null)");
+    expect(source).toContain("detail-close-button");
+    expect(styles).toContain(".calendar-workspace.detail-closed");
+  });
 });

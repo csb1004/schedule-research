@@ -265,6 +265,10 @@ a {
   padding: 16px;
 }
 
+.calendar-workspace.detail-closed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .calendar-panel {
   min-width: 0;
 }
@@ -335,25 +339,20 @@ a {
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.26);
 }
 
-.date-cell.own-status {
-  border-width: 2px;
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06);
+.date-cell.own-red .day-number {
+  color: var(--red);
 }
 
-.date-cell.own-red {
-  border-color: var(--red);
+.date-cell.own-yellow .day-number {
+  color: #b77900;
 }
 
-.date-cell.own-yellow {
-  border-color: var(--yellow);
+.date-cell.own-blue .day-number {
+  color: #2563eb;
 }
 
-.date-cell.own-blue {
-  border-color: var(--blue);
-}
-
-.date-cell.own-green {
-  border-color: var(--green);
+.date-cell.own-green .day-number {
+  color: #128454;
 }
 
 .date-cell:disabled {
@@ -372,36 +371,6 @@ a {
   color: inherit;
   font-size: 14px;
   font-weight: 900;
-}
-
-.own-status-badge {
-  display: inline-flex;
-  align-items: center;
-  min-width: 0;
-  max-width: 64px;
-  border-radius: 999px;
-  padding: 3px 6px;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 900;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.own-status-badge.red {
-  background: var(--red);
-}
-
-.own-status-badge.yellow {
-  background: #d99000;
-}
-
-.own-status-badge.blue {
-  background: var(--blue);
-}
-
-.own-status-badge.green {
-  background: #14945b;
 }
 
 .status-slot-grid {
@@ -433,12 +402,6 @@ a {
 
 .status-slot.empty {
   visibility: hidden;
-}
-
-.status-slot.mine {
-  box-shadow:
-    inset 0 0 0 2px #0f172a,
-    0 4px 10px rgba(15, 23, 42, 0.12);
 }
 
 .red::before {
@@ -489,6 +452,12 @@ a {
   font-size: 12px;
 }
 
+.detail-heading-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .closed-badge {
   border-radius: 999px;
   background: #e2e8f0;
@@ -496,6 +465,26 @@ a {
   color: #64748b;
   font-size: 11px;
   font-weight: 900;
+}
+
+.detail-close-button {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.detail-close-button:hover {
+  border-color: #94a3b8;
+  color: var(--text);
 }
 
 .status-button-row {

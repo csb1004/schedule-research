@@ -45,12 +45,12 @@ describe("date range helpers", () => {
 });
 
 describe("buildMonthDays", () => {
-  it("builds calendar cells starting on Monday and ending on Sunday", () => {
+  it("builds calendar cells starting on Sunday and ending on Saturday", () => {
     const days = buildMonthDays("2026-06");
 
-    expect(days[0]?.date).toBe("2026-06-01");
-    expect(days[0]?.inMonth).toBe(true);
-    expect(days.at(-1)?.date).toBe("2026-07-05");
+    expect(days[0]?.date).toBe("2026-05-31");
+    expect(days[0]?.inMonth).toBe(false);
+    expect(days.at(-1)?.date).toBe("2026-07-04");
     expect(days.at(-1)?.inMonth).toBe(false);
     expect(days).toHaveLength(35);
   });

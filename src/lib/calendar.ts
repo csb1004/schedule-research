@@ -28,10 +28,10 @@ export function buildVisibleMonths(anchor: Date, extraMonths: string[]): string[
 export function buildMonthDays(month: string): CalendarDay[] {
   const [year, monthNumber] = month.split("-").map(Number);
   const firstOfMonth = new Date(Date.UTC(year, monthNumber - 1, 1));
-  const startOffset = (firstOfMonth.getUTCDay() + 6) % 7;
+  const startOffset = firstOfMonth.getUTCDay();
   const start = addDays(firstOfMonth, -startOffset);
   const lastOfMonth = new Date(Date.UTC(year, monthNumber, 0));
-  const endOffset = 6 - ((lastOfMonth.getUTCDay() + 6) % 7);
+  const endOffset = 6 - lastOfMonth.getUTCDay();
   const end = addDays(lastOfMonth, endOffset);
   const days: CalendarDay[] = [];
 
