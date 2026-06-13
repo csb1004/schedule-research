@@ -14,7 +14,11 @@ import {
   getMonthDateRange,
   parseDateKey,
 } from "@/lib/calendar";
-import { createShortCode } from "@/lib/user";
+import {
+  getOrCreateUserByDisplayName,
+  normalizeDisplayName,
+  validateDisplayNameRename,
+} from "@/lib/identity";
 
 const USER_COOKIE = "schedule_user_id";
 const ADMIN_COOKIE = "schedule_admin";
@@ -42,12 +46,17 @@ export async function enterName(
   _previousState: EntryState,
   formData: FormData,
 ): Promise<EntryState> {
-  const displayName = String(formData.get("displayName") ?? "").trim();
-  const password = String(formData.get("adminPassword") ?? "");
+  let displayName: string;
 
-  if (!displayName) {
-    return { ok: false, error: "이름을 입력해주세요." };
+  try {
+    displayName = normalizeDisplayName(
+      String(formData.get("displayName") ?? ""),
+    );
+  } catch (error) {
+    return { ok: false, error: getActionErrorMessage(error) };
   }
+
+  const password = String(formData.get("adminPassword") ?? "");
 
   const adminNames = parseAdminNames(process.env.ADMIN_NAMES);
   const isAdminName = adminNames.includes(displayName);
@@ -65,7 +74,7 @@ export async function enterName(
     };
   }
 
-  const user = await createUserWithUniqueCode(displayName);
+  const { user } = await getOrCreateUserByDisplayName(prisma.user, displayName);
   const cookieStore = await cookies();
   cookieStore.set(USER_COOKIE, user.id, cookieOptions());
 
@@ -80,13 +89,19 @@ export async function enterName(
 }
 
 export async function updateDisplayName(formData: FormData): Promise<EntryState> {
-  const displayName = String(formData.get("displayName") ?? "").trim();
+  const user = await requireCurrentUser();
+  let displayName: string;
 
-  if (!displayName) {
-    return { ok: false, error: "이름을 입력해주세요." };
+  try {
+    displayName = await validateDisplayNameRename(
+      prisma.user,
+      String(formData.get("displayName") ?? ""),
+      user.id,
+    );
+  } catch (error) {
+    return { ok: false, error: getActionErrorMessage(error) };
   }
 
-  const user = await requireCurrentUser();
   await prisma.user.update({
     where: { id: user.id },
     data: { displayName },
@@ -274,34 +289,6 @@ async function upsertAvailability(
   });
 }
 
-async function createUserWithUniqueCode(displayName: string) {
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    try {
-      return await prisma.user.create({
-        data: {
-          displayName,
-          shortCode: createShortCode(),
-        },
-      });
-    } catch (error) {
-      if (!isUniqueConstraintError(error)) {
-        throw error;
-      }
-    }
-  }
-
-  throw new Error("사용자 코드를 생성하지 못했습니다.");
-}
-
-function isUniqueConstraintError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "P2002"
-  );
-}
-
 function requireAdminSecret(): string {
   const secret = process.env.ADMIN_SESSION_SECRET;
 
@@ -310,6 +297,10 @@ function requireAdminSecret(): string {
   }
 
   return secret;
+}
+
+function getActionErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "요청을 처리하지 못했습니다.";
 }
 
 function cookieOptions() {

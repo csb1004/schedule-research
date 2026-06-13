@@ -46,6 +46,7 @@ export function ScheduleCalendar({
   const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
   const [reasonEntryId, setReasonEntryId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
   const [pendingSpecialNote, setPendingSpecialNote] =
     useState<PendingSpecialNote | null>(null);
   const [specialReason, setSpecialReason] = useState("");
@@ -228,7 +229,14 @@ export function ScheduleCalendar({
 
   function submitDisplayName(formData: FormData) {
     startTransition(async () => {
-      await updateDisplayName(formData);
+      const result = await updateDisplayName(formData);
+
+      if (!result.ok) {
+        setSettingsError(result.error ?? "이름을 변경하지 못했습니다.");
+        return;
+      }
+
+      setSettingsError(null);
       setSettingsOpen(false);
       router.refresh();
     });
@@ -295,7 +303,10 @@ export function ScheduleCalendar({
           <button
             type="button"
             className="toolbar-pill"
-            onClick={() => setSettingsOpen(true)}
+            onClick={() => {
+              setSettingsError(null);
+              setSettingsOpen(true);
+            }}
           >
             {currentUser.displayName} #{currentUser.shortCode}
           </button>
@@ -368,8 +379,17 @@ export function ScheduleCalendar({
                 required
               />
             </label>
+            {settingsError ? (
+              <p className="form-error">{settingsError}</p>
+            ) : null}
             <div className="dialog-actions">
-              <button type="button" onClick={() => setSettingsOpen(false)}>
+              <button
+                type="button"
+                onClick={() => {
+                  setSettingsError(null);
+                  setSettingsOpen(false);
+                }}
+              >
                 취소
               </button>
               <button type="submit" disabled={isPending}>

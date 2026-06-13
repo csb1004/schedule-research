@@ -32,6 +32,12 @@ class FakeUserIdentityStore implements UserIdentityStore {
   }
 
   async create({ data }: Parameters<UserIdentityStore["create"]>[0]) {
+    if (this.users.some((user) => user.shortCode === data.shortCode)) {
+      throw Object.assign(new Error("Unique constraint failed"), {
+        code: "P2002",
+      });
+    }
+
     const user = {
       id: `user-${this.users.length + 1}`,
       displayName: data.displayName,
@@ -88,6 +94,32 @@ describe("getOrCreateUserByDisplayName", () => {
       user: {
         displayName: "지민",
         shortCode: "ZZ99",
+      },
+      created: true,
+    });
+  });
+
+  it("retries when a generated short code collides", async () => {
+    const userStore = new FakeUserIdentityStore([
+      {
+        id: "existing-user",
+        displayName: "지민",
+        shortCode: "ZZ99",
+        createdAt: new Date("2026-06-01T00:00:00.000Z"),
+      },
+    ]);
+    const codes = ["ZZ99", "YY88"];
+
+    await expect(
+      getOrCreateUserByDisplayName(
+        userStore,
+        "민지",
+        () => codes.shift() ?? "NOPE",
+      ),
+    ).resolves.toMatchObject({
+      user: {
+        displayName: "민지",
+        shortCode: "YY88",
       },
       created: true,
     });
