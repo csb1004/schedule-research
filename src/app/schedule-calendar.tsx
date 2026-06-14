@@ -101,7 +101,8 @@ export function ScheduleCalendar({
       }
     }
 
-    function handleDocumentPointerEnd() {
+    function handleDocumentPointerEnd(event: PointerEvent) {
+      extendDragSelectionFromPoint(event.clientX, event.clientY);
       finishDragSelection();
     }
 
@@ -121,14 +122,19 @@ export function ScheduleCalendar({
     document.addEventListener("pointerup", handleDocumentPointerEnd);
     document.addEventListener("pointercancel", handleDocumentPointerEnd);
     document.addEventListener("mousemove", handleDocumentMouseMove);
-    document.addEventListener("mouseup", handleDocumentPointerEnd);
+    function handleDocumentMouseEnd(event: MouseEvent) {
+      extendDragSelectionFromPoint(event.clientX, event.clientY);
+      finishDragSelection();
+    }
+
+    document.addEventListener("mouseup", handleDocumentMouseEnd);
 
     return () => {
       document.removeEventListener("pointermove", handleDocumentPointerMove);
       document.removeEventListener("pointerup", handleDocumentPointerEnd);
       document.removeEventListener("pointercancel", handleDocumentPointerEnd);
       document.removeEventListener("mousemove", handleDocumentMouseMove);
-      document.removeEventListener("mouseup", handleDocumentPointerEnd);
+      document.removeEventListener("mouseup", handleDocumentMouseEnd);
     };
   });
 
@@ -228,6 +234,7 @@ export function ScheduleCalendar({
 
   function handleDatePointerUp(event: ReactPointerEvent<HTMLButtonElement>) {
     clearLongPressTimer();
+    extendDragSelectionFromPoint(event.clientX, event.clientY);
 
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
@@ -268,6 +275,18 @@ export function ScheduleCalendar({
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
+    }
+  }
+
+  function extendDragSelectionFromPoint(clientX: number, clientY: number) {
+    if (!isDragSelectingRef.current) {
+      return;
+    }
+
+    const date = findDateFromPoint(clientX, clientY);
+
+    if (date) {
+      extendDragSelectionToDate(date);
     }
   }
 
