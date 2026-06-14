@@ -105,14 +105,30 @@ export function ScheduleCalendar({
       finishDragSelection();
     }
 
+    function handleDocumentMouseMove(event: MouseEvent) {
+      if (!isDragSelectingRef.current) {
+        return;
+      }
+
+      const date = findDateFromPoint(event.clientX, event.clientY);
+
+      if (date) {
+        extendDragSelectionToDate(date);
+      }
+    }
+
     document.addEventListener("pointermove", handleDocumentPointerMove);
     document.addEventListener("pointerup", handleDocumentPointerEnd);
     document.addEventListener("pointercancel", handleDocumentPointerEnd);
+    document.addEventListener("mousemove", handleDocumentMouseMove);
+    document.addEventListener("mouseup", handleDocumentPointerEnd);
 
     return () => {
       document.removeEventListener("pointermove", handleDocumentPointerMove);
       document.removeEventListener("pointerup", handleDocumentPointerEnd);
       document.removeEventListener("pointercancel", handleDocumentPointerEnd);
+      document.removeEventListener("mousemove", handleDocumentMouseMove);
+      document.removeEventListener("mouseup", handleDocumentPointerEnd);
     };
   });
 
