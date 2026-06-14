@@ -62,6 +62,43 @@ describe("updateDisplayName name-based identity switching", () => {
   });
 });
 
+describe("admin closed-date availability writes", () => {
+  it("allows admin sessions through the normal single-date availability action", () => {
+    const source = readFileSync("src/app/actions.ts", "utf8");
+    const setAvailabilitySource = actionSource(source, "setAvailability");
+
+    expect(setAvailabilitySource).toContain("const isAdmin = await getIsAdmin()");
+    expect(setAvailabilitySource).toContain(
+      "ensureEditableDate(parsed.date, isAdmin)",
+    );
+  });
+
+  it("allows admin sessions through the normal bulk availability action", () => {
+    const source = readFileSync("src/app/actions.ts", "utf8");
+    const bulkSetAvailabilitySource = actionSource(source, "bulkSetAvailability");
+
+    expect(bulkSetAvailabilitySource).toContain(
+      "const isAdmin = await getIsAdmin()",
+    );
+    expect(bulkSetAvailabilitySource).toContain(
+      "ensureEditableDate(date, isAdmin)",
+    );
+  });
+
+  it("preserves closed days instead of reopening them before setting availability", () => {
+    const source = readFileSync("src/app/actions.ts", "utf8");
+    const adminSetAvailabilitySource = actionSource(
+      source,
+      "adminSetAvailability",
+    );
+
+    expect(adminSetAvailabilitySource).toContain("ensureAdminEditableDay");
+    expect(adminSetAvailabilitySource).not.toContain("await ensureDay");
+    expect(source).toContain("async function ensureAdminEditableDay");
+    expect(source).toContain("create: { date: parseDateKey(date), isOpen: false");
+  });
+});
+
 function actionSource(source: string, actionName: string): string {
   const start = source.indexOf(`export async function ${actionName}`);
   const end = source.indexOf("export async function", start + 1);

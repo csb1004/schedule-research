@@ -105,4 +105,11 @@ describe("ScheduleCalendar special note UI", () => {
     expect(source).toContain("openVisibleMonths");
     expect(source).toContain("const months = isAdmin");
   });
+
+  it("treats unstored admin-only month days as closed until an admin opens them", () => {
+    const source = readFileSync("src/lib/schedule-data.ts", "utf8");
+
+    expect(source).toContain("isOpen: dayRow?.isOpen ?? false");
+    expect(source).toContain("isVisible: dayRow?.isVisible ?? false");
+  });
 });

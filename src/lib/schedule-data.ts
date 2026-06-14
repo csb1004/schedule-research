@@ -106,8 +106,8 @@ export async function loadScheduleData(
     const summary = sanitizeClosedDayForUser(
       {
         ...calendarDay,
-        isOpen: dayRow?.isOpen ?? true,
-        isVisible: dayRow?.isVisible ?? true,
+        isOpen: dayRow?.isOpen ?? false,
+        isVisible: dayRow?.isVisible ?? false,
         counts: aggregateStatusCounts(entries),
         entries,
       },

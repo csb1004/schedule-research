@@ -161,8 +161,9 @@ export async function updateDisplayName(formData: FormData): Promise<EntryState>
 
 export async function setAvailability(input: unknown) {
   const user = await requireCurrentUser();
+  const isAdmin = await getIsAdmin();
   const parsed = availabilityInputSchema().parse(input);
-  await ensureEditableDate(parsed.date, false);
+  await ensureEditableDate(parsed.date, isAdmin);
   await upsertAvailability(user.id, parsed.date, parsed.status, parsed.reason, {
     toggleSameStatus: true,
   });
@@ -171,10 +172,11 @@ export async function setAvailability(input: unknown) {
 
 export async function bulkSetAvailability(input: unknown) {
   const user = await requireCurrentUser();
+  const isAdmin = await getIsAdmin();
   const parsed = bulkAvailabilityInputSchema().parse(input);
 
   for (const date of parsed.dates) {
-    await ensureEditableDate(date, false);
+    await ensureEditableDate(date, isAdmin);
     await upsertAvailability(user.id, date, parsed.status, parsed.reason);
   }
 
@@ -184,7 +186,7 @@ export async function bulkSetAvailability(input: unknown) {
 export async function adminSetAvailability(input: unknown) {
   await requireAdmin();
   const parsed = adminAvailabilityInputSchema().parse(input);
-  await ensureDay(parsed.date);
+  await ensureAdminEditableDay(parsed.date);
   await upsertAvailability(
     parsed.userId,
     parsed.date,
@@ -291,11 +293,33 @@ async function ensureEditableDate(date: string, isAdmin: boolean) {
     where: { date: parseDateKey(date) },
   });
 
+  if (!day) {
+    if (!isAdmin) {
+      throw new Error("닫힌 날짜는 수정할 수 없습니다.");
+    }
+
+    await ensureAdminEditableDay(date);
+    return;
+  }
+
   if (day && !day.isOpen && !isAdmin) {
     throw new Error("닫힌 날짜는 수정할 수 없습니다.");
   }
 
+  if (isAdmin) {
+    await ensureAdminEditableDay(date);
+    return;
+  }
+
   await ensureDay(date);
+}
+
+async function ensureAdminEditableDay(date: string) {
+  await prisma.day.upsert({
+    where: { date: parseDateKey(date) },
+    update: { isVisible: true },
+    create: { date: parseDateKey(date), isOpen: false, isVisible: true },
+  });
 }
 
 async function ensureDay(date: string) {
