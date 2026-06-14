@@ -88,6 +88,34 @@ export function ScheduleCalendar({
 
   useEffect(() => () => clearLongPressTimer(), []);
 
+  useEffect(() => {
+    function handleDocumentPointerMove(event: PointerEvent) {
+      if (!isDragSelectingRef.current) {
+        return;
+      }
+
+      const date = findDateFromPoint(event.clientX, event.clientY);
+
+      if (date) {
+        extendDragSelectionToDate(date);
+      }
+    }
+
+    function handleDocumentPointerEnd() {
+      finishDragSelection();
+    }
+
+    document.addEventListener("pointermove", handleDocumentPointerMove);
+    document.addEventListener("pointerup", handleDocumentPointerEnd);
+    document.addEventListener("pointercancel", handleDocumentPointerEnd);
+
+    return () => {
+      document.removeEventListener("pointermove", handleDocumentPointerMove);
+      document.removeEventListener("pointerup", handleDocumentPointerEnd);
+      document.removeEventListener("pointercancel", handleDocumentPointerEnd);
+    };
+  });
+
   const selectedDay = useMemo(
     () =>
       selectedDate
@@ -189,6 +217,10 @@ export function ScheduleCalendar({
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
 
+    finishDragSelection();
+  }
+
+  function finishDragSelection() {
     isDragSelectingRef.current = false;
     dragSelectionAnchorDateRef.current = null;
   }
