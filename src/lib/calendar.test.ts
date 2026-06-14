@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildAdminMonths,
+  buildMonthRange,
   buildMonthDays,
+  buildMonthSpanThroughLatestOpenMonth,
   buildVisibleMonths,
   enumerateDateRange,
   getMonthDateRange,
@@ -23,6 +26,62 @@ describe("buildVisibleMonths", () => {
         "2026-10",
       ]),
     ).toEqual(["2026-05", "2026-06", "2026-07", "2026-08", "2026-10"]);
+  });
+});
+
+describe("admin month policy", () => {
+  it("returns the current month plus the next 11 months for admins", () => {
+    expect(buildAdminMonths(new Date("2026-06-13T00:00:00Z"), [])).toEqual([
+      "2026-06",
+      "2026-07",
+      "2026-08",
+      "2026-09",
+      "2026-10",
+      "2026-11",
+      "2026-12",
+      "2027-01",
+      "2027-02",
+      "2027-03",
+      "2027-04",
+      "2027-05",
+    ]);
+  });
+
+  it("keeps stored months outside the default admin horizon", () => {
+    expect(
+      buildAdminMonths(new Date("2026-06-13T00:00:00Z"), ["2027-08"]),
+    ).toContain("2027-08");
+  });
+});
+
+describe("normal user month policy", () => {
+  it("includes closed months between the current month and latest open month", () => {
+    expect(
+      buildMonthSpanThroughLatestOpenMonth(
+        new Date("2026-06-13T00:00:00Z"),
+        ["2026-06", "2026-08"],
+      ),
+    ).toEqual(["2026-06", "2026-07", "2026-08"]);
+  });
+
+  it("falls back to the current month when no open months exist", () => {
+    expect(
+      buildMonthSpanThroughLatestOpenMonth(
+        new Date("2026-06-13T00:00:00Z"),
+        [],
+      ),
+    ).toEqual(["2026-06"]);
+  });
+});
+
+describe("buildMonthRange", () => {
+  it("builds an inclusive range between two month keys", () => {
+    expect(buildMonthRange("2026-11", "2027-02")).toEqual([
+      "2026-11",
+      "2026-12",
+      "2027-01",
+      "2027-02",
+    ]);
   });
 });
 
