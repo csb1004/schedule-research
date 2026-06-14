@@ -157,7 +157,6 @@ export function ScheduleCalendar({
       isDragSelectingRef.current = true;
       dragSelectionAnchorDateRef.current = day.date;
       setSelectionMode(true);
-      setSelectedDate(null);
       setReasonEntryId(null);
       setSelectedDates(new Set([day.date]));
     }, LONG_PRESS_DELAY_MS);
@@ -176,12 +175,10 @@ export function ScheduleCalendar({
       return;
     }
 
-    const target = document
-      .elementFromPoint(event.clientX, event.clientY)
-      ?.closest<HTMLButtonElement>("[data-date]");
+    const date = findDateFromPoint(event.clientX, event.clientY);
 
-    if (target?.dataset.date) {
-      extendDragSelectionToDate(target.dataset.date);
+    if (date) {
+      extendDragSelectionToDate(date);
     }
   }
 
@@ -934,6 +931,31 @@ function writeCalendarMonthCookie(month: string) {
   document.cookie = `${CALENDAR_MONTH_COOKIE_NAME}=${encodeURIComponent(
     month,
   )}; Max-Age=31536000; Path=/; SameSite=Lax`;
+}
+
+function findDateFromPoint(clientX: number, clientY: number): string | null {
+  const directTarget = document
+    .elementFromPoint(clientX, clientY)
+    ?.closest<HTMLButtonElement>("[data-date]");
+
+  if (directTarget?.dataset.date) {
+    return directTarget.dataset.date;
+  }
+
+  for (const cell of document.querySelectorAll<HTMLButtonElement>("[data-date]")) {
+    const rect = cell.getBoundingClientRect();
+
+    if (
+      clientX >= rect.left &&
+      clientX <= rect.right &&
+      clientY >= rect.top &&
+      clientY <= rect.bottom
+    ) {
+      return cell.dataset.date ?? null;
+    }
+  }
+
+  return null;
 }
 
 function formatMonthLabel(month: string): string {
