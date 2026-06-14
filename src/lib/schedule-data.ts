@@ -5,8 +5,9 @@ import {
   type StatusCounts,
 } from "@/lib/availability";
 import {
+  buildAdminMonths,
   buildMonthDays,
-  buildVisibleMonths,
+  buildMonthSpanThroughLatestOpenMonth,
   formatMonth,
   parseDateKey,
 } from "@/lib/calendar";
@@ -50,10 +51,15 @@ export async function loadScheduleData(
   const today = new Date();
   const visibleDayRows = await prisma.day.findMany({
     where: { isVisible: true },
-    select: { date: true },
+    select: { date: true, isOpen: true },
   });
-  const extraMonths = visibleDayRows.map((day) => formatMonth(day.date));
-  const months = buildVisibleMonths(today, extraMonths);
+  const storedVisibleMonths = visibleDayRows.map((day) => formatMonth(day.date));
+  const openVisibleMonths = visibleDayRows
+    .filter((day) => day.isOpen)
+    .map((day) => formatMonth(day.date));
+  const months = isAdmin
+    ? buildAdminMonths(today, storedVisibleMonths)
+    : buildMonthSpanThroughLatestOpenMonth(today, openVisibleMonths);
   const fallbackMonth = formatMonth(today);
   const selectedMonth =
     selectedMonthInput && months.includes(selectedMonthInput)

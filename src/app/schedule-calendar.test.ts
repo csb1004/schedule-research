@@ -96,4 +96,13 @@ describe("ScheduleCalendar special note UI", () => {
     expect(pageSource).toContain("parseMonthPreference");
     expect(pageSource).toContain("cookies()");
   });
+
+  it("loads admin month navigation separately from normal user month navigation", () => {
+    const source = readFileSync("src/lib/schedule-data.ts", "utf8");
+
+    expect(source).toContain("buildAdminMonths");
+    expect(source).toContain("buildMonthSpanThroughLatestOpenMonth");
+    expect(source).toContain("openVisibleMonths");
+    expect(source).toContain("const months = isAdmin");
+  });
 });
