@@ -463,6 +463,36 @@ export function ScheduleCalendar({
     });
   }
 
+  function downloadMonthJson() {
+    const payload = {
+      month: schedule.selectedMonth,
+      downloadedAt: new Date().toISOString(),
+      days: schedule.days
+        .filter((day) => day.inMonth)
+        .map((day) => ({
+          date: day.date,
+          isOpen: day.isOpen,
+          isVisible: day.isVisible,
+          counts: day.counts,
+          entries: day.entries.map((entry) => ({
+            userName: entry.userName,
+            status: entry.status,
+            reason: entry.reason,
+          })),
+        })),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `schedule-${schedule.selectedMonth}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   function submitDisplayName(formData: FormData) {
     startTransition(async () => {
       const result = await updateDisplayName(formData);
@@ -608,6 +638,16 @@ export function ScheduleCalendar({
         </div>
       </header>
 
+      {isAdmin ? (
+        <AdminMonthControls
+          selectedMonth={schedule.selectedMonth}
+          days={schedule.days}
+          isPending={isPending}
+          onSetMonthOpen={setMonthOpen}
+          onDownloadMonthJson={downloadMonthJson}
+        />
+      ) : null}
+
       {selectionMode ? (
         <section className="bulk-bar">
           <strong>{selectedDateCount}개 선택</strong>
@@ -670,7 +710,6 @@ export function ScheduleCalendar({
             onApplyStatus={applyStatus}
             onAdminStatus={applyAdminStatus}
             onSetDayOpen={setDayOpen}
-            onSetMonthOpen={setMonthOpen}
             onClose={closeDetailPanel}
           />
         ) : null}
@@ -840,6 +879,51 @@ function DateCell({
   );
 }
 
+function AdminMonthControls({
+  selectedMonth,
+  days,
+  isPending,
+  onSetMonthOpen,
+  onDownloadMonthJson,
+}: {
+  selectedMonth: string;
+  days: ScheduleDay[];
+  isPending: boolean;
+  onSetMonthOpen: (isOpen: boolean) => void;
+  onDownloadMonthJson: () => void;
+}) {
+  const inMonthDays = days.filter((day) => day.inMonth);
+  const openCount = inMonthDays.filter((day) => day.isOpen).length;
+  const totalCount = inMonthDays.length;
+  const allOpen = totalCount > 0 && openCount === totalCount;
+
+  return (
+    <section className="admin-month-controls">
+      <strong>{formatMonthLabel(selectedMonth)}</strong>
+      <span>{allOpen ? "열림" : `닫힘 ${totalCount - openCount}일`}</span>
+      <div>
+        <button
+          type="button"
+          disabled={isPending || allOpen}
+          onClick={() => onSetMonthOpen(true)}
+        >
+          이 달 열기
+        </button>
+        <button
+          type="button"
+          disabled={isPending || openCount === 0}
+          onClick={() => onSetMonthOpen(false)}
+        >
+          이 달 닫기
+        </button>
+        <button type="button" onClick={onDownloadMonthJson}>
+          JSON 다운로드
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function DetailPanel({
   day,
   isAdmin,
@@ -850,7 +934,6 @@ function DetailPanel({
   onApplyStatus,
   onAdminStatus,
   onSetDayOpen,
-  onSetMonthOpen,
   onClose,
 }: {
   day: ScheduleDay;
@@ -862,7 +945,6 @@ function DetailPanel({
   onApplyStatus: (status: Status) => void;
   onAdminStatus: (entry: ScheduleEntry, status: Status) => void;
   onSetDayOpen: (isOpen: boolean) => void;
-  onSetMonthOpen: (isOpen: boolean) => void;
   onClose: () => void;
 }) {
   const activeReason = day.entries.find((entry) => entry.id === reasonEntryId);
@@ -911,12 +993,6 @@ function DetailPanel({
         <div className="admin-controls">
           <button type="button" onClick={() => onSetDayOpen(!day.isOpen)}>
             날짜 {day.isOpen ? "닫기" : "열기"}
-          </button>
-          <button type="button" onClick={() => onSetMonthOpen(true)}>
-            이번 달 열기
-          </button>
-          <button type="button" onClick={() => onSetMonthOpen(false)}>
-            이번 달 닫기
           </button>
         </div>
       ) : null}

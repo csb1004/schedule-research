@@ -112,4 +112,24 @@ describe("ScheduleCalendar special note UI", () => {
     expect(source).toContain("isOpen: dayRow?.isOpen ?? false");
     expect(source).toContain("isVisible: dayRow?.isVisible ?? false");
   });
+
+  it("renders separate admin month controls outside the detail panel", () => {
+    const source = readFileSync("src/app/schedule-calendar.tsx", "utf8");
+
+    expect(source).toContain("AdminMonthControls");
+    expect(source).toContain("onSetMonthOpen");
+    expect(source).toContain("onDownloadMonthJson");
+
+    const detailPanelSource = source.slice(source.indexOf("function DetailPanel"));
+    expect(detailPanelSource).not.toContain("onSetMonthOpen");
+  });
+
+  it("downloads the selected month as a json file", () => {
+    const source = readFileSync("src/app/schedule-calendar.tsx", "utf8");
+
+    expect(source).toContain("downloadMonthJson");
+    expect(source).toContain("schedule-${schedule.selectedMonth}.json");
+    expect(source).toContain("application/json");
+    expect(source).toContain("URL.createObjectURL");
+  });
 });
