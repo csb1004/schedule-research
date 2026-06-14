@@ -55,4 +55,25 @@ describe("ScheduleCalendar special note UI", () => {
     expect(source).toContain("detail-close-button");
     expect(styles).toContain(".calendar-workspace.detail-closed");
   });
+
+  it("renders a persisted multi-select highlight filter next to multi date selection", () => {
+    const source = readFileSync("src/app/schedule-calendar.tsx", "utf8");
+    const styles = readFileSync("src/app/globals.css", "utf8");
+
+    expect(source).toContain("highlightMenuOpen");
+    expect(source).toContain("HIGHLIGHT_COOKIE_NAME");
+    expect(source).toContain("하이라이트 없음");
+    expect(source).toContain("highlightStatuses");
+    expect(styles).toContain(".highlight-menu");
+  });
+
+  it("applies highlight background classes to date cells", () => {
+    const source = readFileSync("src/app/schedule-calendar.tsx", "utf8");
+    const styles = readFileSync("src/app/globals.css", "utf8");
+
+    expect(source).toContain("highlightColorName");
+    expect(source).toContain("highlight-${highlightColorName}");
+    expect(styles).toContain(".date-cell.highlight-red");
+    expect(styles).toContain(".date-cell.highlight-green");
+  });
 });

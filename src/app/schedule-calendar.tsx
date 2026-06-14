@@ -1,7 +1,7 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   adminSetAvailability,
@@ -17,6 +17,12 @@ import type {
   ScheduleEntry,
   ScheduleUser,
 } from "@/lib/schedule-data";
+import {
+  getHighlightColorName,
+  HIGHLIGHT_COOKIE_NAME,
+  parseHighlightStatusCookie,
+  serializeHighlightStatuses,
+} from "@/lib/highlight";
 import { STATUS_LABELS, STATUS_SLOTS, type Status } from "@/lib/status";
 
 type ScheduleCalendarProps = {
@@ -53,10 +59,20 @@ export function ScheduleCalendar({
   const [settingsAdminName, setSettingsAdminName] = useState<string | null>(
     null,
   );
+  const [highlightMenuOpen, setHighlightMenuOpen] = useState(false);
+  const [highlightStatuses, setHighlightStatuses] = useState<Set<Status>>(
+    new Set(),
+  );
   const [pendingSpecialNote, setPendingSpecialNote] =
     useState<PendingSpecialNote | null>(null);
   const [specialReason, setSpecialReason] = useState("");
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    setHighlightStatuses(
+      new Set(parseHighlightStatusCookie(readCookie(HIGHLIGHT_COOKIE_NAME))),
+    );
+  }, []);
 
   const selectedDay = useMemo(
     () =>
@@ -105,6 +121,27 @@ export function ScheduleCalendar({
   function closeDetailPanel() {
     setSelectedDate(null);
     setReasonEntryId(null);
+  }
+
+  function updateHighlightStatuses(nextStatuses: Set<Status>) {
+    setHighlightStatuses(nextStatuses);
+    writeHighlightStatusCookie(nextStatuses);
+  }
+
+  function toggleHighlightStatus(status: Status) {
+    const next = new Set(highlightStatuses);
+
+    if (next.has(status)) {
+      next.delete(status);
+    } else {
+      next.add(status);
+    }
+
+    updateHighlightStatuses(next);
+  }
+
+  function clearHighlightStatuses() {
+    updateHighlightStatuses(new Set());
   }
 
   function applyStatus(status: Status) {
@@ -335,6 +372,49 @@ export function ScheduleCalendar({
           >
             여러 날짜 선택
           </button>
+          <div className="highlight-menu-wrap">
+            <button
+              type="button"
+              className={
+                highlightStatuses.size > 0
+                  ? "toolbar-pill active"
+                  : "toolbar-pill"
+              }
+              aria-expanded={highlightMenuOpen}
+              onClick={() => setHighlightMenuOpen((open) => !open)}
+            >
+              {highlightStatuses.size > 0
+                ? `하이라이트 ${highlightStatuses.size}`
+                : "하이라이트 없음"}
+            </button>
+            {highlightMenuOpen ? (
+              <div className="highlight-menu">
+                <button
+                  type="button"
+                  className="highlight-clear"
+                  onClick={clearHighlightStatuses}
+                >
+                  하이라이트 없음
+                </button>
+                <div className="highlight-option-list">
+                  {STATUS_SLOTS.map((slot) => (
+                    <label key={slot.status} className="highlight-option">
+                      <input
+                        type="checkbox"
+                        checked={highlightStatuses.has(slot.status)}
+                        onChange={() => toggleHighlightStatus(slot.status)}
+                      />
+                      <span
+                        className={`highlight-swatch ${slot.colorName}`}
+                        aria-hidden="true"
+                      />
+                      <span>{slot.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
           <button
             type="button"
             className="toolbar-pill"
@@ -390,6 +470,7 @@ export function ScheduleCalendar({
                 multiSelected={selectedDates.has(day.date)}
                 isAdmin={isAdmin}
                 currentUserId={currentUser.id}
+                highlightStatuses={highlightStatuses}
                 onClick={() => handleDateClick(day)}
               />
             ))}
@@ -497,6 +578,7 @@ function DateCell({
   multiSelected,
   isAdmin,
   currentUserId,
+  highlightStatuses,
   onClick,
 }: {
   day: ScheduleDay;
@@ -504,6 +586,7 @@ function DateCell({
   multiSelected: boolean;
   isAdmin: boolean;
   currentUserId: string;
+  highlightStatuses: Set<Status>;
   onClick: () => void;
 }) {
   const disabled = !day.inMonth || (!day.isOpen && !isAdmin);
@@ -511,12 +594,17 @@ function DateCell({
   const ownStatusColor = currentUserEntry
     ? statusColor(currentUserEntry.status)
     : null;
+  const highlightColorName = getHighlightColorName(
+    day.counts,
+    highlightStatuses,
+  );
   const className = [
     "date-cell",
     !day.inMonth ? "outside" : "",
     !day.isOpen ? "closed" : "",
     selected ? "selected" : "",
     multiSelected ? "multi-selected" : "",
+    highlightColorName ? `highlight-${highlightColorName}` : "",
     currentUserEntry ? "own-status" : "",
     ownStatusColor ? `own-${ownStatusColor}` : "",
   ]
@@ -686,6 +774,28 @@ function findCurrentUserEntry(
   currentUserId: string,
 ): ScheduleEntry | null {
   return day.entries.find((entry) => entry.userId === currentUserId) ?? null;
+}
+
+function readCookie(name: string): string {
+  const prefix = `${name}=`;
+  const cookie = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(prefix));
+
+  return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : "";
+}
+
+function writeHighlightStatusCookie(statuses: Iterable<Status>) {
+  const value = serializeHighlightStatuses(statuses);
+
+  if (!value) {
+    document.cookie = `${HIGHLIGHT_COOKIE_NAME}=; Max-Age=0; Path=/; SameSite=Lax`;
+    return;
+  }
+
+  document.cookie = `${HIGHLIGHT_COOKIE_NAME}=${encodeURIComponent(
+    value,
+  )}; Max-Age=31536000; Path=/; SameSite=Lax`;
 }
 
 function formatMonthLabel(month: string): string {
