@@ -76,4 +76,24 @@ describe("ScheduleCalendar special note UI", () => {
     expect(styles).toContain(".date-cell.highlight-red");
     expect(styles).toContain(".date-cell.highlight-green");
   });
+
+  it("enters multi-select mode from a long-pressed date and supports drag range selection", () => {
+    const source = readFileSync("src/app/schedule-calendar.tsx", "utf8");
+
+    expect(source).toContain("LONG_PRESS_DELAY_MS");
+    expect(source).toContain("handleDatePointerDown");
+    expect(source).toContain("handleDatePointerEnter");
+    expect(source).toContain("dragSelectionAnchorDate");
+    expect(source).toContain("getCalendarDateRange");
+  });
+
+  it("persists the selected calendar month in a cookie", () => {
+    const source = readFileSync("src/app/schedule-calendar.tsx", "utf8");
+    const pageSource = readFileSync("src/app/page.tsx", "utf8");
+
+    expect(source).toContain("writeCalendarMonthCookie");
+    expect(source).toContain("CALENDAR_MONTH_COOKIE_NAME");
+    expect(pageSource).toContain("parseMonthPreference");
+    expect(pageSource).toContain("cookies()");
+  });
 });

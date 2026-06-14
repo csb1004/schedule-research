@@ -1,7 +1,7 @@
 "use client";
 
-import type { FormEvent } from "react";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import type { FormEvent, PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   adminSetAvailability,
@@ -17,13 +17,17 @@ import type {
   ScheduleEntry,
   ScheduleUser,
 } from "@/lib/schedule-data";
+import { getCalendarDateRange } from "@/lib/date-selection";
 import {
   getHighlightColorName,
   HIGHLIGHT_COOKIE_NAME,
   parseHighlightStatusCookie,
   serializeHighlightStatuses,
 } from "@/lib/highlight";
+import { CALENDAR_MONTH_COOKIE_NAME } from "@/lib/month-preference";
 import { STATUS_LABELS, STATUS_SLOTS, type Status } from "@/lib/status";
+
+const LONG_PRESS_DELAY_MS = 450;
 
 type ScheduleCalendarProps = {
   currentUser: ScheduleUser;
@@ -67,12 +71,22 @@ export function ScheduleCalendar({
     useState<PendingSpecialNote | null>(null);
   const [specialReason, setSpecialReason] = useState("");
   const [isPending, startTransition] = useTransition();
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragSelectionAnchorDateRef = useRef<string | null>(null);
+  const isDragSelectingRef = useRef(false);
+  const suppressNextClickRef = useRef(false);
 
   useEffect(() => {
     setHighlightStatuses(
       new Set(parseHighlightStatusCookie(readCookie(HIGHLIGHT_COOKIE_NAME))),
     );
   }, []);
+
+  useEffect(() => {
+    writeCalendarMonthCookie(schedule.selectedMonth);
+  }, [schedule.selectedMonth]);
+
+  useEffect(() => () => clearLongPressTimer(), []);
 
   const selectedDay = useMemo(
     () =>
@@ -91,10 +105,16 @@ export function ScheduleCalendar({
       return;
     }
 
+    writeCalendarMonthCookie(month);
     router.push(`/?month=${month}`);
   }
 
   function handleDateClick(day: ScheduleDay) {
+    if (suppressNextClickRef.current) {
+      suppressNextClickRef.current = false;
+      return;
+    }
+
     if (!day.inMonth || (!day.isOpen && !isAdmin)) {
       return;
     }
@@ -116,6 +136,94 @@ export function ScheduleCalendar({
 
     setSelectedDate(day.date);
     setReasonEntryId(null);
+  }
+
+  function handleDatePointerDown(
+    event: ReactPointerEvent<HTMLButtonElement>,
+    day: ScheduleDay,
+  ) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    if (!isSelectableDay(day)) {
+      return;
+    }
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+    clearLongPressTimer();
+    longPressTimerRef.current = setTimeout(() => {
+      suppressNextClickRef.current = true;
+      isDragSelectingRef.current = true;
+      dragSelectionAnchorDateRef.current = day.date;
+      setSelectionMode(true);
+      setSelectedDate(null);
+      setReasonEntryId(null);
+      setSelectedDates(new Set([day.date]));
+    }, LONG_PRESS_DELAY_MS);
+  }
+
+  function handleDatePointerEnter(day: ScheduleDay) {
+    if (!isDragSelectingRef.current) {
+      return;
+    }
+
+    extendDragSelectionToDate(day.date);
+  }
+
+  function handleDatePointerMove(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (!isDragSelectingRef.current) {
+      return;
+    }
+
+    const target = document
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest<HTMLButtonElement>("[data-date]");
+
+    if (target?.dataset.date) {
+      extendDragSelectionToDate(target.dataset.date);
+    }
+  }
+
+  function handleDatePointerUp(event: ReactPointerEvent<HTMLButtonElement>) {
+    clearLongPressTimer();
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    isDragSelectingRef.current = false;
+    dragSelectionAnchorDateRef.current = null;
+  }
+
+  function extendDragSelectionToDate(date: string) {
+    const anchorDate = dragSelectionAnchorDateRef.current;
+
+    if (!anchorDate) {
+      return;
+    }
+
+    const selectableDates = getCalendarDateRange(
+      schedule.days,
+      anchorDate,
+      date,
+    ).filter((rangeDate) => {
+      const rangeDay = schedule.days.find((day) => day.date === rangeDate);
+      return rangeDay ? isSelectableDay(rangeDay) : false;
+    });
+
+    setSelectedDates(new Set(selectableDates));
+  }
+
+  function isSelectableDay(day: ScheduleDay) {
+    return day.inMonth && (day.isOpen || isAdmin);
+  }
+
+  function clearLongPressTimer() {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
   }
 
   function closeDetailPanel() {
@@ -368,6 +476,8 @@ export function ScheduleCalendar({
             onClick={() => {
               setSelectionMode((enabled) => !enabled);
               setSelectedDates(new Set());
+              isDragSelectingRef.current = false;
+              dragSelectionAnchorDateRef.current = null;
             }}
           >
             여러 날짜 선택
@@ -472,6 +582,11 @@ export function ScheduleCalendar({
                 currentUserId={currentUser.id}
                 highlightStatuses={highlightStatuses}
                 onClick={() => handleDateClick(day)}
+                onPointerDown={(event) => handleDatePointerDown(event, day)}
+                onPointerEnter={() => handleDatePointerEnter(day)}
+                onPointerMove={handleDatePointerMove}
+                onPointerUp={handleDatePointerUp}
+                onPointerCancel={handleDatePointerUp}
               />
             ))}
           </div>
@@ -580,6 +695,11 @@ function DateCell({
   currentUserId,
   highlightStatuses,
   onClick,
+  onPointerDown,
+  onPointerEnter,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
 }: {
   day: ScheduleDay;
   selected: boolean;
@@ -588,6 +708,11 @@ function DateCell({
   currentUserId: string;
   highlightStatuses: Set<Status>;
   onClick: () => void;
+  onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  onPointerEnter: () => void;
+  onPointerMove: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  onPointerUp: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  onPointerCancel: (event: ReactPointerEvent<HTMLButtonElement>) => void;
 }) {
   const disabled = !day.inMonth || (!day.isOpen && !isAdmin);
   const currentUserEntry = findCurrentUserEntry(day, currentUserId);
@@ -615,9 +740,16 @@ function DateCell({
     <button
       type="button"
       className={className}
+      data-date={day.date}
       disabled={disabled}
       aria-pressed={Boolean(currentUserEntry)}
       onClick={onClick}
+      onPointerDown={onPointerDown}
+      onPointerEnter={onPointerEnter}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+      onContextMenu={(event) => event.preventDefault()}
     >
       <span className="date-cell-heading">
         <span className="day-number">{day.day}</span>
@@ -795,6 +927,12 @@ function writeHighlightStatusCookie(statuses: Iterable<Status>) {
 
   document.cookie = `${HIGHLIGHT_COOKIE_NAME}=${encodeURIComponent(
     value,
+  )}; Max-Age=31536000; Path=/; SameSite=Lax`;
+}
+
+function writeCalendarMonthCookie(month: string) {
+  document.cookie = `${CALENDAR_MONTH_COOKIE_NAME}=${encodeURIComponent(
+    month,
   )}; Max-Age=31536000; Path=/; SameSite=Lax`;
 }
 

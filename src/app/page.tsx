@@ -1,4 +1,9 @@
 import { getCurrentUser, getIsAdmin } from "@/app/actions";
+import { cookies } from "next/headers";
+import {
+  CALENDAR_MONTH_COOKIE_NAME,
+  parseMonthPreference,
+} from "@/lib/month-preference";
 import { loadScheduleData } from "@/lib/schedule-data";
 import { NameEntryForm } from "./name-entry-form";
 import { ScheduleCalendar } from "./schedule-calendar";
@@ -26,7 +31,11 @@ export default async function Home({ searchParams }: PageProps) {
   }
 
   const isAdmin = await getIsAdmin();
-  const schedule = await loadScheduleData(params?.month, isAdmin);
+  const cookieStore = await cookies();
+  const cookieMonth = parseMonthPreference(
+    cookieStore.get(CALENDAR_MONTH_COOKIE_NAME)?.value,
+  );
+  const schedule = await loadScheduleData(params?.month ?? cookieMonth, isAdmin);
 
   return (
     <ScheduleCalendar

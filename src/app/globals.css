@@ -380,6 +380,8 @@ a {
   padding: 9px;
   color: var(--text);
   text-align: left;
+  touch-action: none;
+  user-select: none;
   transition:
     border-color 140ms ease,
     box-shadow 140ms ease,
