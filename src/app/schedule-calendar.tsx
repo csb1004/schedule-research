@@ -206,7 +206,6 @@ export function ScheduleCalendar({
       suppressNextClickRef.current = true;
       isDragSelectingRef.current = true;
       dragSelectionAnchorDateRef.current = day.date;
-      setSelectionMode(true);
       setReasonEntryId(null);
       setSelectedDates(new Set([day.date]));
     }, LONG_PRESS_DELAY_MS);
@@ -244,6 +243,10 @@ export function ScheduleCalendar({
   }
 
   function finishDragSelection() {
+    if (isDragSelectingRef.current) {
+      setSelectionMode(true);
+    }
+
     isDragSelectingRef.current = false;
     dragSelectionAnchorDateRef.current = null;
   }
